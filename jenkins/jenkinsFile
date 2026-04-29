@@ -6,9 +6,8 @@ pipeline {
             agent { 
                 docker {
                     image 'golang:1.21'
-                    reuseNode true
                     // This argument helps if Jenkins is running in a container
-                    args '-v /var/run/docker.sock:/var/run/docker.sock' 
+                    args '-v jenkins-docker-certs:/certs/client:ro' 
                 }
             }
             environment {
