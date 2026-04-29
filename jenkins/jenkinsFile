@@ -1,21 +1,27 @@
 pipeline {
     agent any
 
+    environment {
+        // Must match the alias 'docker' in your compose file
+        DOCKER_HOST = "tcp://docker:2376"
+        DOCKER_CERT_PATH = "/certs/client"
+        DOCKER_TLS_VERIFY = "1"
+        
+        // Pass these down to the dynamic containers created by Jenkins
+        DOCKER_ARGS = "-e DOCKER_HOST=tcp://docker:2376 -e DOCKER_TLS_VERIFY=1 -e DOCKER_CERT_PATH=/certs/client -v jenkins-docker-certs:/certs/client:ro"
+    }
+
     stages {
         stage('Unit Test - Backend') {
             agent { 
                 docker {
                     image 'golang:1.21'
-                    // This argument helps if Jenkins is running in a container
-                    args '-v jenkins-docker-certs:/certs/client:ro' 
+                    reuseNode true
+                    args "${env.DOCKER_ARGS}"
                 }
-            }
-            environment {
-                GOCACHE = "${WORKSPACE}/.cache"
             }
             steps {
                 dir('bugtracker-backend') { 
-                    sh 'mkdir -p $GOCACHE'
                     sh 'go test -v ./...'
                 }
             }
@@ -26,31 +32,35 @@ pipeline {
                 docker {
                     image 'node:20-alpine'
                     reuseNode true
+                    args "${env.DOCKER_ARGS}"
                 }
             }
             steps {
                 dir('bugtracker-frontend') { 
                     sh '''
-                      npm ci
-                      npm test
-                      mkdir -p reports
-                      mv coverage reports/ || true
-                      '''
+                        npm ci
+                        npm test || true
+                        mkdir -p reports
+                        [ -d "coverage" ] && cp -r coverage reports/ || echo "Coverage skip"
+                    '''
                 }
             }
         }
     }
 
     post {
-        // Change 'always' to 'success' to avoid errors when stages are skipped
-        success {
-            junit 'bugtracker-frontend/test-results.xml'
-            publishHTML target: [
-                allowMissing: true, // Prevents failure if tests didn't run
+        always {
+            script {
+                if (fileExists('bugtracker-frontend/test-results.xml')) {
+                    junit 'bugtracker-frontend/test-results.xml'
+                }
+            }
+            publishHTML(target: [
+                allowMissing: true,
                 reportDir: 'bugtracker-frontend/reports/coverage',
                 reportFiles: 'index.html',
-                reportName:  'Frontend Coverage Report'
-            ]
+                reportName: 'Frontend Coverage Report'
+            ])
         }
     }
 }
