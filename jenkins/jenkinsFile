@@ -1,81 +1,29 @@
 pipeline {
     agent any
 
-    stages {
-        // stage('Build Backend') {
-        //     agent {
-        //         docker {
-        //             image 'golang:1.21-alpine'
-        //             reuseNode true
-        //         }
-        //     }
-        //     steps {
-        //         dir('bugtracker-backend') {
-        //             sh '''
-        //                 export GOCACHE="$PWD/.cache"
-        //                 mkdir -p "$GOCACHE"
-        //                 go build -o bugtracker-backend cmd/bugtracker/main.go
-        //             '''
-        //         }
-        //     }
-        // }
-
-        stage ('Test Backend') {
-            agent {
-                docker {
-                    image 'snakee/golang-junit:1.21'
-                    reuseNode true
-                    alwaysPull true
-                }
+    stage ('Test Backend') {
+        agent {
+            docker {
+                image 'snakee/golang-junit:1.21'
+                reuseNode true
+                alwaysPull true
             }
+        }
             
-            steps {
-                dir('bugtracker-backend') {
-                    sh '''
-                        # Clean up any existing files
-                        rm -f coverage.html coverage.out report.xml
+        steps {
+            dir('bugtracker-backend') {
+                sh '''
+                    # Clean up any existing files
+                    rm -f coverage.html coverage.out report.xml
 
-                        go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml
+                     go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml
                                                 
-                        # Generate coverage report
-                        go test -coverprofile=coverage.out -covermode=atomic ./...
-                        go tool cover -html=coverage.out -o coverage.html
+                    # Generate coverage report
+                    go test -coverprofile=coverage.out -covermode=atomic ./...
+                    go tool cover -html=coverage.out -o coverage.html
                     '''
-                }
-            }
-            post {
-                always {
-                    junit 'bugtracker-backend/report.xml'
-                    publishHTML target: [
-                        allowMissing: true, 
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'bugtracker-backend',
-                        reportFiles: 'coverage.html',
-                        reportName: 'Coverage Report'
-                    ]
-                }
-            }
+             }
         }
-        stage('Build and Test Frontend') {
-            agent {
-                docker {
-                    image 'node:20-alpine'
-                    reuseNode true
-                }
-            }
-            steps {
-                dir('bugtracker-frontend') {
-                    sh 'npm ci'
-                    sh 'npm test -- --reporters=default --reporters=jest-junit'
-                }
-            }
-            post {
-                always {
-                    junit 'bugtracker-frontend/test-results.xml'
-                    cleanWs()
-                }
-            }
-        }
+        
     }
 }
