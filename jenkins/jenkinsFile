@@ -7,12 +7,9 @@ pipeline {
                 docker {
                     image 'golang:1.21'
                     reuseNode true
-                    // Ensures files created in Docker are owned by the Jenkins user
-                    args '-u root:root' 
                 }
             }
             environment {
-                // Using workspace-relative path for Go cache
                 GOCACHE = "${WORKSPACE}/.cache"
             }
             steps {
@@ -22,40 +19,35 @@ pipeline {
                 }
             }
         }
-
-        stage('Unit Test - Frontend') {
+          stage('Unit Test - Frontend') {
             agent { 
                 docker {
                     image 'node:20-alpine'
                     reuseNode true
                 }
             }
+
             steps {
                 dir('bugtracker-frontend') { 
                     sh '''
-                        npm ci
-                        # Ensure your test runner actually generates this XML file!
-                        npm test -- --reporters=default --reporters=jest-junit 
-                        mkdir -p reports
-                        # Using -f to prevent errors if coverage doesn't exist
-                        cp -r coverage reports/ || true 
-                    '''
+                      npm ci
+                      npm test
+                      mkdir -p reports
+                      mv coverage reports/
+                      '''
                 }
             }
-            post {
-                always {
-                    // Note: Paths are relative to WORKSPACE root, not the 'dir' above
+            post{
+                always{
                     junit 'bugtracker-frontend/test-results.xml'
-                    publishHTML(target: [
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'bugtracker-frontend/reports/coverage',
-                        reportFiles: 'index.html',
-                        reportName: 'Frontend Coverage Report'
-                    ])
+                    publishHTML target: [
+                        reportDir: 'bugtracker-frontend/reports/coverage'
+                        reportFiles: 'index.html'
+                        reportName:  'Frontend Coverage Report'
+                    ]
                 }
             }
-        }
+
+        
     }
 }
