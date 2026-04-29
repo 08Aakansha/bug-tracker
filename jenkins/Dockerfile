@@ -1,43 +1,17 @@
-services:
-  jenkins-docker:
-    image: docker:dind
-    container_name: jenkins-docker
-    privileged: true
-    environment:
-      - DOCKER_TLS_CERTDIR=/certs
-    volumes:
-      - jenkins-docker-certs:/certs/client
-      - jenkins-data:/var/jenkins_home
-    ports:
-      - "2376:2376"
-    networks:
-      jenkins:
-        aliases:
-          - docker
-    command: --storage-driver overlay2
+FROM jenkins/jenkins:lts-jdk17
 
-  my-jenkins:
-    image: my-jenkins
-    container_name: my-jenkins
-    restart: on-failure
-    environment:
-      - DOCKER_HOST=tcp://docker:2376
-      - DOCKER_CERT_PATH=/certs/client
-      - DOCKER_TLS_VERIFY=1
-      - JAVA_OPTS=-Dhudson.model.DirectoryBrowserSupport.CSP="default-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
-    volumes:
-      - jenkins-data:/var/jenkins_home
-      - jenkins-docker-certs:/certs/client:ro
-    ports:
-      - "9000:8080"
-      - "50000:50000"
-    networks:
-      - jenkins
+USER root
 
-networks:
-  jenkins:
-    driver: bridge
+RUN apt-get update && apt-get install -y lsb-release
 
-volumes:
-  jenkins-docker-certs:
-  jenkins-data:
+RUN curl -fsSLo /usr/share/keyrings/docker-archive-keyring.asc \
+  https://download.docker.com/linux/debian/gpg
+
+RUN echo "deb [arch=$(dpkg --print-architecture) \
+  signed-by=/usr/share/keyrings/docker-archive-keyring.asc] \
+  https://download.docker.com/linux/debian \
+  $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+
+RUN apt-get update && apt-get install -y docker-ce-cli
+
+USER jenkins
