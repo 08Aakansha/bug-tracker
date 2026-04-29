@@ -1,29 +1,34 @@
 pipeline {
     agent any
 
-    stage ('Test Backend') {
-        agent {
-            docker {
-                image 'snakee/golang-junit:1.21'
-                reuseNode true
-                alwaysPull true
+    // This was the missing wrapper block
+    stages {
+        
+        stage ('Test Backend') {
+            agent {
+                docker {
+                    image 'snakee/golang-junit:1.21'
+                    reuseNode true
+                    alwaysPull true
+                }
+            }
+                
+            steps {
+                dir('bugtracker-backend') {
+                    sh '''
+                        # Clean up any existing files
+                        rm -f coverage.html coverage.out report.xml
+
+                        # Run tests and generate report
+                        go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml
+                                                    
+                        # Generate coverage report
+                        go test -coverprofile=coverage.out -covermode=atomic ./...
+                        go tool cover -html=coverage.out -o coverage.html
+                    '''
+                }
             }
         }
-            
-        steps {
-            dir('bugtracker-backend') {
-                sh '''
-                    # Clean up any existing files
-                    rm -f coverage.html coverage.out report.xml
-
-                     go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml
-                                                
-                    # Generate coverage report
-                    go test -coverprofile=coverage.out -covermode=atomic ./...
-                    go tool cover -html=coverage.out -o coverage.html
-                    '''
-             }
-        }
         
-    }
+    } // End of stages
 }
