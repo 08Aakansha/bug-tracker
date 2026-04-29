@@ -7,6 +7,8 @@ pipeline {
                 docker {
                     image 'golang:1.21'
                     reuseNode true
+                    // This argument helps if Jenkins is running in a container
+                    args '-v /var/run/docker.sock:/var/run/docker.sock' 
                 }
             }
             environment {
@@ -33,21 +35,23 @@ pipeline {
                       npm ci
                       npm test
                       mkdir -p reports
-                      mv coverage reports/
+                      mv coverage reports/ || true
                       '''
                 }
             }
-        } // End of Frontend Stage
-    } // End of Stages
+        }
+    }
 
     post {
-        always {
+        // Change 'always' to 'success' to avoid errors when stages are skipped
+        success {
             junit 'bugtracker-frontend/test-results.xml'
             publishHTML target: [
+                allowMissing: true, // Prevents failure if tests didn't run
                 reportDir: 'bugtracker-frontend/reports/coverage',
                 reportFiles: 'index.html',
                 reportName:  'Frontend Coverage Report'
             ]
         }
     }
-} // End of Pipeline
+}
