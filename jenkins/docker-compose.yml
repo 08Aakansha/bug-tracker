@@ -1,3 +1,5 @@
+version: "3.7"
+
 services:
   jenkins-docker:
     image: docker:dind
@@ -24,13 +26,12 @@ services:
       - DOCKER_HOST=tcp://docker:2376
       - DOCKER_CERT_PATH=/certs/client
       - DOCKER_TLS_VERIFY=1
-      - JAVA_OPTS=-Dhudson.model.DirectoryBrowserSupport.CSP="default-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
     volumes:
       - jenkins-data:/var/jenkins_home
       - jenkins-docker-certs:/certs/client:ro
     ports:
-      - "8081:8080"
-      - "50001:50000"
+      - "9000:8080"
+      - "50000:50000"
     networks:
       - jenkins
 

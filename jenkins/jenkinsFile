@@ -1,66 +1,68 @@
 pipeline {
     agent any
 
-    environment {
-        // Must match the alias 'docker' in your compose file
-        DOCKER_HOST = "tcp://docker:2376"
-        DOCKER_CERT_PATH = "/certs/client"
-        DOCKER_TLS_VERIFY = "1"
-        
-        // Pass these down to the dynamic containers created by Jenkins
-        DOCKER_ARGS = "-e DOCKER_HOST=tcp://docker:2376 -e DOCKER_TLS_VERIFY=1 -e DOCKER_CERT_PATH=/certs/client -v jenkins-docker-certs:/certs/client:ro"
-    }
-
     stages {
-        stage('Unit Test - Backend') {
-            agent { 
-                docker {
-                    image 'golang:1.21'
-                    reuseNode true
-                    args "${env.DOCKER_ARGS}"
-                }
-            }
+        stage('w/o docker') {
             steps {
-                dir('bugtracker-backend') { 
-                    sh 'go test -v ./...'
-                }
+                sh 'echo "Without docker"'
+                sh 'touch container-no.txt'
             }
         }
 
-        stage('Unit Test - Frontend') {
-            agent { 
+        stage('Build') {
+            agent {
                 docker {
-                    image 'node:20-alpine'
+                    image 'golang:1.21-alpine'
                     reuseNode true
-                    args "${env.DOCKER_ARGS}"
                 }
             }
             steps {
-                dir('bugtracker-frontend') { 
+                dir('bugtracker-backend') {
                     sh '''
-                        npm ci
-                        npm test || true
-                        mkdir -p reports
-                        [ -d "coverage" ] && cp -r coverage reports/ || echo "Coverage skip"
+                        export GOCACHE="$PWD/.cache"
+                        mkdir -p "$GOCACHE"
+                        go build -o bugtracker-backend cmd/bugtracker/main.go
                     '''
                 }
             }
         }
-    }
 
-    post {
-        always {
-            script {
-                if (fileExists('bugtracker-frontend/test-results.xml')) {
-                    junit 'bugtracker-frontend/test-results.xml'
+        stage ('Test') {
+            agent {
+                docker {
+                    image 'snakee/golang-junit:1.21'
+                    reuseNode true
+                    alwaysPull true
                 }
             }
-            publishHTML(target: [
-                allowMissing: true,
-                reportDir: 'bugtracker-frontend/reports/coverage',
-                reportFiles: 'index.html',
-                reportName: 'Frontend Coverage Report'
-            ])
+            
+            steps {
+                dir('bugtracker-backend') {
+                    sh '''
+                        # Clean up any existing files
+                        rm -f coverage.html coverage.out report.xml
+
+                        go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml
+                                                
+                        # Generate coverage report
+                        go test -coverprofile=coverage.out -covermode=atomic ./...
+                        go tool cover -html=coverage.out -o coverage.html
+                    '''
+                }
+            }
+            post {
+                always {
+                    junit 'bugtracker-backend/report.xml'
+                    publishHTML target: [
+                        allowMissing: true, 
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'bugtracker-backend',
+                        reportFiles: 'coverage.html',
+                        reportName: 'Coverage Report'
+                    ]
+                }
+            }
         }
     }
 }
