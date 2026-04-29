@@ -19,14 +19,14 @@ pipeline {
                 }
             }
         }
-          stage('Unit Test - Frontend') {
+
+        stage('Unit Test - Frontend') {
             agent { 
                 docker {
                     image 'node:20-alpine'
                     reuseNode true
                 }
             }
-
             steps {
                 dir('bugtracker-frontend') { 
                     sh '''
@@ -37,17 +37,17 @@ pipeline {
                       '''
                 }
             }
-            post{
-                always{
-                    junit 'bugtracker-frontend/test-results.xml'
-                    publishHTML target: [
-                        reportDir: 'bugtracker-frontend/reports/coverage'
-                        reportFiles: 'index.html'
-                        reportName:  'Frontend Coverage Report'
-                    ]
-                }
-            }
+        } // End of Frontend Stage
+    } // End of Stages
 
-        
+    post {
+        always {
+            junit 'bugtracker-frontend/test-results.xml'
+            publishHTML target: [
+                reportDir: 'bugtracker-frontend/reports/coverage',
+                reportFiles: 'index.html',
+                reportName:  'Frontend Coverage Report'
+            ]
+        }
     }
-}
+} // End of Pipeline
